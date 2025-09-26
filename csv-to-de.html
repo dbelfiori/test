@@ -28,10 +28,15 @@ try {
     var rawHeaders = lines[0].split(",");
     var headers = [];
 
+    // Sanitize headers
+    Write("<h3>🧪 Sanitized Headers:</h3><ul>");
     for (var h = 0; h < rawHeaders.length; h++) {
       headers[h] = sanitizeHeader(rawHeaders[h]);
+      Write("<li>" + headers[h] + "</li>");
     }
+    Write("</ul>");
 
+    // Build preview table
     htmlTable += "<table border='1' cellpadding='5' cellspacing='0'><thead><tr>";
     for (var h = 0; h < headers.length; h++) {
       htmlTable += "<th>" + headers[h] + "</th>";
@@ -48,9 +53,16 @@ try {
       }
       htmlTable += "</tr>";
 
+      // Debug output for each row
+      Write("<p>✅ Processed row " + i + ":</p><ul>");
       for (var k = 0; k < headers.length; k++) {
-        Variable.SetValue(headers[k] + "_" + i, row[k].trim());
+        var key = headers[k] + "_" + i;
+        var value = row[k].trim();
+        Variable.SetValue(key, value);
+        Write("<li>" + key + " = " + value + "</li>");
       }
+      Write("</ul>");
+
       rowCount++;
     }
 
