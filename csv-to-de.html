@@ -85,3 +85,54 @@ ELSE
   OUTPUT("<p>🕒 Waiting for CSV input...</p>")
 ENDIF
 ]%%
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  const textarea = document.querySelector('textarea[name="csvText"]');
+
+  const allowedHeaders = [
+    "FISCAL_WEEK_ID",
+    "Promo Start/Deploy Date",
+    "Deploy Time",
+    "Media Type",
+    "Campaign Type",
+    "Campaign Name",
+    "Campaign Manager",
+    "Audience Prepared by",
+    "Developer",
+    "Checklist",
+    "Campaign Producer",
+    "Creative Job #",
+    "Creative DUE -  modify days/logic",
+    "Campaign Scheduled (Actual Date)"
+  ];
+
+  textarea.addEventListener("paste", function (e) {
+    e.preventDefault();
+
+    const pastedText = (e.clipboardData || window.clipboardData).getData("text");
+    const lines = pastedText.split(/\r?\n/);
+    if (lines.length < 2) return;
+
+    const rawHeaders = lines[0].split(",");
+    const headerMap = {};
+
+    // Build map of allowed header indexes
+    rawHeaders.forEach((header, index) => {
+      const trimmed = header.trim();
+      if (allowedHeaders.includes(trimmed)) {
+        headerMap[index] = trimmed;
+      }
+    });
+
+    // Rebuild CSV with only allowed columns
+    const cleanedLines = lines.map(line => {
+      const cols = line.split(",");
+      const filtered = Object.keys(headerMap).map(i => cols[i] || "");
+      return filtered.join(",");
+    });
+
+    textarea.value = cleanedLines.join("\n");
+  });
+});
+</script>
