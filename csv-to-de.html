@@ -3,19 +3,18 @@
   <br><br>
   <input type="submit" value="Upload and Upsert" />
 </form>
-
 <script runat="server">
 Platform.Load("Core", "1.1.1");
 
-// Read uploaded CSV file content
 var uploadedFile = Request.GetUploadedFile("csvfile");
 var csvContent = "";
 
-if (uploadedFile && uploadedFile.Content) {
+if (uploadedFile && uploadedFile.Content && uploadedFile.Content.length > 0) {
   csvContent = uploadedFile.Content;
+} else {
+  csvContent = "ERROR: No file uploaded or file is empty";
 }
 
-// Pass content to AMPscript
 Variable.SetValue("csvContent", csvContent);
 </script>
 
@@ -23,22 +22,18 @@ Variable.SetValue("csvContent", csvContent);
 SET @csvContent = AttributeValue("csvContent")
 SET @deName = "YourDataExtensionName"
 
-IF NOT EMPTY(@csvContent) THEN
+IF IndexOf(@csvContent, "ERROR:") == 0 THEN
   SET @lines = BuildRowsetFromString(@csvContent, "\n")
   SET @rowCount = RowCount(@lines)
 
   IF @rowCount > 1 THEN
-    SET @headerRow = Row(@lines, 1)
-    SET @headers = BuildRowsetFromString(@headerRow, ",")
-    SET @fieldCount = RowCount(@headers)
     SET @inserted = 0
 
     FOR @i = 2 TO @rowCount DO
       SET @line = Row(@lines, @i)
       SET @fields = BuildRowsetFromString(@line, ",")
 
-      IF RowCount(@fields) == @fieldCount THEN
-        /* Static field mapping — adjust to match your DE */
+      IF RowCount(@fields) >= 3 THEN
         SET @email = Field(Row(@fields, 1), 1)
         SET @firstName = Field(Row(@fields, 2), 1)
         SET @lastName = Field(Row(@fields, 3), 1)
@@ -55,6 +50,6 @@ IF NOT EMPTY(@csvContent) THEN
     OUTPUT("<p style='color:red;'>❌ CSV must contain a header and at least one data row.</p>")
   ENDIF
 ELSE
-  OUTPUT("<p>🕒 Waiting for file upload...</p>")
+  OUTPUT(CONCAT("<p style='color:red;'>", @csvContent, "</p>"))
 ENDIF
 ]%%
