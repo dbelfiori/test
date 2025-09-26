@@ -1,124 +1,86 @@
-<h2>📥 Upload Campaign CSV to Preview and Upsert</h2>
-<form method="post" enctype="multipart/form-data">
-  <input type="file" name="csvfile" accept=".csv" required />
+<h2>📋 Paste CSV Content</h2>
+<form method="post">
+  <textarea name="csvText" rows="10" cols="100" placeholder="Paste CSV here..." required></textarea>
   <br><br>
-  <input type="submit" value="Upload and Preview" />
+  <input type="submit" value="Preview and Upsert" />
 </form>
 
-<script runat="server">
-Platform.Load("Core", "1.1.1");
-
-// Header sanitizer: replaces spaces/dashes with underscores, removes all other non-alphanumerics except underscore
-function sanitizeHeader(header) {
-  return header
-    .trim()
-    .replace(/[\s\-]/g, "_")
-    .replace(/[^A-Za-z0-9_]/g, "");
-}
-
-var htmlTable = "";
-var rowCount = 0;
-
-try {
-  var uploadedFile = Request.GetUploadedFile("csvfile");
-
-  if (uploadedFile && uploadedFile.Content && uploadedFile.Content.length > 0) {
-    var csvContent = uploadedFile.Content;
-    var lines = csvContent.split(/\r?\n/);
-    var rawHeaders = lines[0].split(",");
-    var headers = [];
-
-    // Sanitize headers
-    Write("<h3>🧪 Sanitized Headers:</h3><ul>");
-    for (var h = 0; h < rawHeaders.length; h++) {
-      headers[h] = sanitizeHeader(rawHeaders[h]);
-      Write("<li>" + headers[h] + "</li>");
-    }
-    Write("</ul>");
-
-    // Build preview table
-    htmlTable += "<table border='1' cellpadding='5' cellspacing='0'><thead><tr>";
-    for (var h = 0; h < headers.length; h++) {
-      htmlTable += "<th>" + headers[h] + "</th>";
-    }
-    htmlTable += "</tr></thead><tbody>";
-
-    for (var i = 1; i < lines.length; i++) {
-      var row = lines[i].split(",");
-      if (row.length !== headers.length) continue;
-
-      htmlTable += "<tr>";
-      for (var j = 0; j < row.length; j++) {
-        htmlTable += "<td>" + row[j].trim() + "</td>";
-      }
-      htmlTable += "</tr>";
-
-      // Debug output for each row
-      Write("<p>✅ Processed row " + i + ":</p><ul>");
-      for (var k = 0; k < headers.length; k++) {
-        var key = headers[k] + "_" + i;
-        var value = row[k].trim();
-        Variable.SetValue(key, value);
-        Write("<li>" + key + " = " + value + "</li>");
-      }
-      Write("</ul>");
-
-      rowCount++;
-    }
-
-    htmlTable += "</tbody></table>";
-    Variable.SetValue("rowCount", rowCount);
-  }
-} catch (e) {
-  htmlTable = "<p style='color:red;'>⚠️ Error reading file: " + String(e) + "</p>";
-}
-
-Write(htmlTable);
-</script>
-
 %%[
+SET @csvContent = RequestParameter("csvText")
 SET @deName = "db-SS-Tracker"
-SET @rowCount = AttributeValue("rowCount")
 
-IF NOT EMPTY(@rowCount) THEN
-  SET @inserted = 0
+IF NOT EMPTY(@csvContent) THEN
+  SET @lines = BuildRowsetFromString(@csvContent, "\n")
+  SET @rowCount = RowCount(@lines)
 
-  FOR @i = 1 TO @rowCount DO
-    SET @FISCAL_WEEK_ID = AttributeValue(CONCAT("FISCAL_WEEK_ID_", @i))
-    SET @Promo_StartDeployDate = AttributeValue(CONCAT("Promo_StartDeployDate_", @i))
-    SET @Deploy_Time = AttributeValue(CONCAT("Deploy_Time_", @i))
-    SET @Media_Type = AttributeValue(CONCAT("Media_Type_", @i))
-    SET @Campaign_Type = AttributeValue(CONCAT("Campaign_Type_", @i))
-    SET @Campaign_Name = AttributeValue(CONCAT("Campaign_Name_", @i))
-    SET @Campaign_Manager = AttributeValue(CONCAT("Campaign_Manager_", @i))
-    SET @Audience_Prepared_by = AttributeValue(CONCAT("Audience_Prepared_by_", @i))
-    SET @Developer = AttributeValue(CONCAT("Developer_", @i))
-    SET @Checklist = AttributeValue(CONCAT("Checklist_", @i))
-    SET @Campaign_Producer = AttributeValue(CONCAT("Campaign_Producer_", @i))
-    SET @Creative_Job_ = AttributeValue(CONCAT("Creative_Job__", @i))
-    SET @Creative_DUE____modify_dayslogic = AttributeValue(CONCAT("Creative_DUE____modify_dayslogic_", @i))
-    SET @Campaign_Scheduled_Actual_Date = AttributeValue(CONCAT("Campaign_Scheduled_Actual_Date_", @i))
+  IF @rowCount > 1 THEN
+    SET @headerRow = Row(@lines, 1)
+    SET @headers = BuildRowsetFromString(@headerRow, ",")
+    SET @fieldCount = RowCount(@headers)
+    SET @inserted = 0
 
-    IF NOT EMPTY(@Campaign_Name) THEN
-      UPSERTDE(@deName, 1, "Campaign_Name", @Campaign_Name,
-        "FISCAL_WEEK_ID", @FISCAL_WEEK_ID,
-        "Promo_StartDeployDate", @Promo_StartDeployDate,
-        "Deploy_Time", @Deploy_Time,
-        "Media_Type", @Media_Type,
-        "Campaign_Type", @Campaign_Type,
-        "Campaign_Manager", @Campaign_Manager,
-        "Audience_Prepared_by", @Audience_Prepared_by,
-        "Developer", @Developer,
-        "Checklist", @Checklist,
-        "Campaign_Producer", @Campaign_Producer,
-        "Creative_Job_", @Creative_Job_,
-        "Creative_DUE____modify_dayslogic", @Creative_DUE____modify_dayslogic,
-        "Campaign_Scheduled_Actual_Date", @Campaign_Scheduled_Actual_Date
-      )
-      SET @inserted = Add(@inserted, 1)
-    ENDIF
-  NEXT @i
+    OUTPUT("<table border='1'><thead><tr>")
+    FOR @h = 1 TO @fieldCount DO
+      SET @header = Field(Row(@headers, @h), 1)
+      OUTPUT(CONCAT("<th>", @header, "</th>"))
+    NEXT @h
+    OUTPUT("</tr></thead><tbody>")
 
-  OUTPUT(CONCAT("<p style='color:green;'>✅ Upserted ", @inserted, " rows into ", @deName, ".</p>"))
+    FOR @i = 2 TO @rowCount DO
+      SET @line = Row(@lines, @i)
+      SET @fields = BuildRowsetFromString(@line, ",")
+
+      IF RowCount(@fields) == @fieldCount THEN
+        OUTPUT("<tr>")
+        FOR @j = 1 TO @fieldCount DO
+          SET @value = Field(Row(@fields, @j), 1)
+          OUTPUT(CONCAT("<td>", @value, "</td>"))
+        NEXT @j
+        OUTPUT("</tr>")
+
+        /* Static mapping — adjust indexes to match your DE */
+        SET @FISCAL_WEEK_ID = Field(Row(@fields, 1), 1)
+        SET @Promo_StartDeployDate = Field(Row(@fields, 2), 1)
+        SET @Deploy_Time = Field(Row(@fields, 3), 1)
+        SET @Media_Type = Field(Row(@fields, 4), 1)
+        SET @Campaign_Type = Field(Row(@fields, 5), 1)
+        SET @Campaign_Name = Field(Row(@fields, 6), 1)
+        SET @Campaign_Manager = Field(Row(@fields, 7), 1)
+        SET @Audience_Prepared_by = Field(Row(@fields, 8), 1)
+        SET @Developer = Field(Row(@fields, 9), 1)
+        SET @Checklist = Field(Row(@fields, 10), 1)
+        SET @Campaign_Producer = Field(Row(@fields, 11), 1)
+        SET @Creative_Job_ = Field(Row(@fields, 12), 1)
+        SET @Creative_DUE____modify_dayslogic = Field(Row(@fields, 13), 1)
+        SET @Campaign_Scheduled_Actual_Date = Field(Row(@fields, 14), 1)
+
+        IF NOT EMPTY(@Campaign_Name) THEN
+          UPSERTDE(@deName, 1, "Campaign_Name", @Campaign_Name,
+            "FISCAL_WEEK_ID", @FISCAL_WEEK_ID,
+            "Promo_StartDeployDate", @Promo_StartDeployDate,
+            "Deploy_Time", @Deploy_Time,
+            "Media_Type", @Media_Type,
+            "Campaign_Type", @Campaign_Type,
+            "Campaign_Manager", @Campaign_Manager,
+            "Audience_Prepared_by", @Audience_Prepared_by,
+            "Developer", @Developer,
+            "Checklist", @Checklist,
+            "Campaign_Producer", @Campaign_Producer,
+            "Creative_Job_", @Creative_Job_,
+            "Creative_DUE____modify_dayslogic", @Creative_DUE____modify_dayslogic,
+            "Campaign_Scheduled_Actual_Date", @Campaign_Scheduled_Actual_Date
+          )
+          SET @inserted = Add(@inserted, 1)
+        ENDIF
+      ENDIF
+    NEXT @i
+
+    OUTPUT("</tbody></table>")
+    OUTPUT(CONCAT("<p style='color:green;'>✅ Upserted ", @inserted, " rows into ", @deName, ".</p>"))
+  ELSE
+    OUTPUT("<p style='color:red;'>❌ CSV must contain a header and at least one data row.</p>")
+  ENDIF
+ELSE
+  OUTPUT("<p>🕒 Waiting for CSV input...</p>")
 ENDIF
 ]%%
