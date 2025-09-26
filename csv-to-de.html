@@ -58,6 +58,16 @@ SET @overwriteDE = "YourTargetDEName"
     const fileInput = document.getElementById('csvfile');
     const form = document.getElementById('uploadForm');
 
+    function sanitizeFieldName(name) {
+    // Replace spaces and dashes with underscores
+    var cleaned = name.replace(/[\s\-]+/g, "_");
+
+    // Remove all other non-alphanumeric characters except underscore
+    cleaned = cleaned.replace(/[^a-zA-Z0-9_]/g, "");
+
+    return cleaned;
+    }
+
     dropzone.addEventListener('dragover', function(e) {
       e.preventDefault();
       dropzone.classList.add('dragover');
