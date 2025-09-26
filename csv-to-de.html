@@ -2,13 +2,33 @@
 <div id="dropzone">Drop CSV file here</div>
 <form id="uploadForm" method="post" enctype="multipart/form-data">
   <input type="file" name="csvfile" id="csvfile" accept=".csv" style="display:none" />
-  <input type="submit" value="Upload" style="display:none" />
+  <input type="submit" id="submitBtn" value="Upload" style="display:none" />
 </form>
+
+<style>
+  #dropzone {
+    width: 100%;
+    height: 200px;
+    border: 2px dashed #ccc;
+    border-radius: 10px;
+    text-align: center;
+    line-height: 200px;
+    font-size: 18px;
+    color: #666;
+    margin-bottom: 20px;
+  }
+  #dropzone.dragover {
+    border-color: #4CAF50;
+    color: #4CAF50;
+    background-color: #f9fff9;
+  }
+</style>
 
 <script>
   const dropzone = document.getElementById('dropzone');
   const fileInput = document.getElementById('csvfile');
   const form = document.getElementById('uploadForm');
+  const submitBtn = document.getElementById('submitBtn');
 
   dropzone.addEventListener('dragover', function(e) {
     e.preventDefault();
@@ -25,7 +45,7 @@
     const files = e.dataTransfer.files;
     if (files.length > 0 && files[0].type === "text/csv") {
       fileInput.files = files;
-      form.submit();
+      submitBtn.click(); // trigger form submission
     } else {
       alert("Please drop a valid CSV file.");
     }
@@ -34,8 +54,6 @@
 
 <script runat="server">
 Platform.Load("Core", "1.1.1");
-
-Write("<p>✅ Script loaded...</p>");
 
 function sanitizeFieldName(name) {
   var cleaned = name.replace(/[\s\-]+/g, "_");
@@ -80,11 +98,9 @@ try {
 
     Write("<p>🧼 Sanitized headers: " + sanitizedHeaders.join(", ") + "</p>");
 
-    // Clear existing rows
     Platform.Function.DeleteData(overwriteDE, ["1"], ["1"]);
     Write("<p>🧹 Existing rows deleted from DE: " + overwriteDE + "</p>");
 
-    // Insert new rows
     var insertedCount = 0;
     for (var i = 1; i < lines.length; i++) {
       var line = lines[i].trim();
@@ -108,7 +124,7 @@ try {
       insertedCount++;
     }
 
-    Write("<p style='color:green;'>✅ Successfully inserted " + insertedCount + " rows into <strong>" + overwriteDE + "</strong>.</p>");
+    Write("<p style='color:green;'>✅ Inserted " + insertedCount + " rows into <strong>" + overwriteDE + "</strong>.</p>");
   } else {
     Write("<p>🕒 Waiting for file upload...</p>");
   }
