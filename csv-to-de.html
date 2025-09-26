@@ -8,11 +8,14 @@
 <script runat="server">
 Platform.Load("Core", "1.1.1");
 
-var uploadedFile = Request.GetUploadedFile("csvfile");
 var csvContent = "";
-
-if (uploadedFile && uploadedFile.Content && uploadedFile.Content.length > 0) {
-  csvContent = uploadedFile.Content;
+try {
+  var uploadedFile = Request.GetUploadedFile("csvfile");
+  if (uploadedFile && uploadedFile.Content && uploadedFile.Content.length > 0) {
+    csvContent = uploadedFile.Content;
+  }
+} catch (e) {
+  csvContent = "ERROR: " + String(e);
 }
 
 Variable.SetValue("csvContent", csvContent);
@@ -22,7 +25,9 @@ Variable.SetValue("csvContent", csvContent);
 SET @csvContent = AttributeValue("csvContent")
 SET @deName = "YourDataExtensionName"
 
-IF NOT EMPTY(@csvContent) THEN
+IF IndexOf(@csvContent, "ERROR:") == 0 THEN
+  OUTPUT(CONCAT("<p style='color:red;'>", @csvContent, "</p>"))
+ELSEIF NOT EMPTY(@csvContent) THEN
   SET @lines = BuildRowsetFromString(@csvContent, "\n")
   SET @rowCount = RowCount(@lines)
 
@@ -53,7 +58,7 @@ IF NOT EMPTY(@csvContent) THEN
         NEXT @j
         OUTPUT("</tr>")
 
-        /* Static field mapping — adjust to match your DE */
+        /* Static mapping — adjust to match your DE */
         SET @email = Field(Row(@fields, 1), 1)
         SET @firstName = Field(Row(@fields, 2), 1)
         SET @lastName = Field(Row(@fields, 3), 1)
@@ -71,6 +76,6 @@ IF NOT EMPTY(@csvContent) THEN
     OUTPUT("<p style='color:red;'>❌ CSV must contain a header and at least one data row.</p>")
   ENDIF
 ELSE
-  OUTPUT("<p>🕒 Waiting for file upload...</p>")
+  OUTPUT("<p style='color:red;'>❌ No CSV content found. Make sure the file was uploaded correctly.</p>")
 ENDIF
 ]%%
