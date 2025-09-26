@@ -1,13 +1,16 @@
 <h2>📋 Paste Campaign CSV Content</h2>
-<form method="post">
-  <textarea name="csvText" rows="12" cols="100" placeholder="Paste CSV here..." required></textarea>
-  <br><br>
-  <input type="submit" value="Preview" />
-</form>
+<textarea id="csvInput" rows="12" cols="100" placeholder="Paste CSV here..."></textarea>
+<br><br>
+<button id="cleanButton">Clean CSV</button>
+
+<h3>✅ Cleaned Output</h3>
+<textarea id="cleanedOutput" rows="12" cols="100" readonly></textarea>
 
 <script>
 document.addEventListener("DOMContentLoaded", function () {
-  const textarea = document.querySelector('textarea[name="csvText"]');
+  const input = document.getElementById("csvInput");
+  const output = document.getElementById("cleanedOutput");
+  const button = document.getElementById("cleanButton");
 
   const allowedHeaders = [
     "FISCAL_WEEK_ID",
@@ -26,10 +29,8 @@ document.addEventListener("DOMContentLoaded", function () {
     "Campaign Scheduled (Actual Date)"
   ];
 
-  textarea.addEventListener("paste", function (e) {
-    e.preventDefault();
-
-    const pastedText = (e.clipboardData || window.clipboardData).getData("text");
+  button.addEventListener("click", function () {
+    const pastedText = input.value;
     const lines = pastedText.split(/\r?\n/);
     if (lines.length < 2) return;
 
@@ -48,7 +49,7 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 
     if (promoDateIndex === -1) {
-      textarea.value = "⚠️ Missing 'Promo Start/Deploy Date' column.";
+      output.value = "⚠️ Missing 'Promo Start/Deploy Date' column.";
       return;
     }
 
@@ -74,19 +75,7 @@ document.addEventListener("DOMContentLoaded", function () {
       }
     }
 
-    textarea.value = cleanedLines.join("\n");
+    output.value = cleanedLines.join("\n");
   });
 });
 </script>
-
-
-%%[
-SET @csvContent = RequestParameter("csvText")
-SET @charCount = Length(@csvContent)
-
-IF NOT EMPTY(@csvContent) THEN
-  OUTPUT(CONCAT("<p style='color:green;'>✅ CSV received with ", @charCount, " characters.</p>"))
-ELSE
-  OUTPUT("<p>🕒 Waiting for CSV input...</p>")
-ENDIF
-]%%
