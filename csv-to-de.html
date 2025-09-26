@@ -1,16 +1,13 @@
 <h2>📋 Paste Campaign CSV Content</h2>
-<textarea id="csvInput" rows="12" cols="100" placeholder="Paste CSV here..."></textarea>
-<br><br>
-<button id="cleanButton">Clean CSV</button>
-
-<h3>✅ Cleaned Output</h3>
-<textarea id="cleanedOutput" rows="12" cols="100" readonly></textarea>
+<form method="post">
+  <textarea name="csvText" rows="12" cols="100" placeholder="Paste CSV here..." required></textarea>
+  <br><br>
+  <input type="submit" value="Preview and Upsert" />
+</form>
 
 <script>
 document.addEventListener("DOMContentLoaded", function () {
-  const input = document.getElementById("csvInput");
-  const output = document.getElementById("cleanedOutput");
-  const button = document.getElementById("cleanButton");
+  const textarea = document.querySelector('textarea[name="csvText"]');
 
   const allowedHeaders = [
     "FISCAL_WEEK_ID",
@@ -29,8 +26,10 @@ document.addEventListener("DOMContentLoaded", function () {
     "Campaign Scheduled (Actual Date)"
   ];
 
-  button.addEventListener("click", function () {
-    const pastedText = input.value;
+  textarea.addEventListener("paste", function (e) {
+    e.preventDefault();
+
+    const pastedText = (e.clipboardData || window.clipboardData).getData("text");
     const lines = pastedText.split(/\r?\n/);
     if (lines.length < 2) return;
 
@@ -49,7 +48,7 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 
     if (promoDateIndex === -1) {
-      output.value = "⚠️ Missing 'Promo Start/Deploy Date' column.";
+      textarea.value = "⚠️ Missing 'Promo Start/Deploy Date' column.";
       return;
     }
 
@@ -65,17 +64,113 @@ document.addEventListener("DOMContentLoaded", function () {
       if (cols.length < rawHeaders.length) continue;
 
       const promoDateRaw = cols[promoDateIndex]?.trim();
-      const promoDateClean = promoDateRaw.replace(/^[A-Za-z]+[\s]+/, "");
-      const [month, day, year] = promoDateClean.split("/").map(s => parseInt(s));
-      const promoDate = new Date(year, month - 1, day);
+      const match = promoDateRaw.match(/\b(\d{1,2})\/(\d{1,2})\/(\d{4})\b/);
 
-      if (promoDateRaw && !isNaN(promoDate) && promoDate >= cutoff) {
-        const filtered = Object.keys(headerMap).map(i => cols[i] || "");
+      if (!match) {
+        console.log(`Row ${i} skipped: invalid date format → "${promoDateRaw}"`);
+        continue;
+      }
+
+      const [_, month, day, year] = match;
+      const promoDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+
+      if (promoDate >= cutoff) {
+        const filtered = Object.keys(headerMap).map(i => cols[i]?.trim() || "");
         cleanedLines.push(filtered.join(","));
+      } else {
+        console.log(`Row ${i} skipped: date too old → ${promoDateRaw}`);
       }
     }
 
-    output.value = cleanedLines.join("\n");
+    textarea.value = cleanedLines.join("\n");
   });
 });
 </script>
+
+
+
+%%[
+SET @csvContent = RequestParameter("csvText")
+SET @deName = "db-SS-Tracker"
+
+IF NOT EMPTY(@csvContent) THEN
+  SET @lines = BuildRowsetFromString(@csvContent, "\n")
+  SET @rowCount = RowCount(@lines)
+
+  IF @rowCount > 1 THEN
+    SET @inserted = 0
+
+    SET @headerRow = Row(@lines, 1)
+    SET @headers = BuildRowsetFromString(@headerRow, ",")
+    SET @fieldCount = RowCount(@headers)
+
+    IF @fieldCount == 14 THEN
+      OUTPUT("<table border='1'><thead><tr>")
+      FOR @h = 1 TO 14 DO
+        SET @header = Field(Row(@headers, @h), 1)
+        OUTPUT(CONCAT("<th>", @header, "</th>"))
+      NEXT @h
+      OUTPUT("</tr></thead><tbody>")
+
+      FOR @i = 2 TO @rowCount DO
+        SET @line = Row(@lines, @i)
+        SET @fields = BuildRowsetFromString(@line, ",")
+
+        IF RowCount(@fields) == 14 THEN
+          OUTPUT("<tr>")
+          FOR @j = 1 TO 14 DO
+            SET @value = Field(Row(@fields, @j), 1)
+            OUTPUT(CONCAT("<td>", @value, "</td>"))
+          NEXT @j
+          OUTPUT("</tr>")
+
+          SET @FISCAL_WEEK_ID = Field(Row(@fields, 1), 1)
+          SET @Promo_StartDeployDate = Field(Row(@fields, 2), 1)
+          SET @Deploy_Time = Field(Row(@fields, 3), 1)
+          SET @Media_Type = Field(Row(@fields, 4), 1)
+          SET @Campaign_Type = Field(Row(@fields, 5), 1)
+          SET @Campaign_Name = Field(Row(@fields, 6), 1)
+          SET @Campaign_Manager = Field(Row(@fields, 7), 1)
+          SET @Audience_Prepared_by = Field(Row(@fields, 8), 1)
+          SET @Developer = Field(Row(@fields, 9), 1)
+          SET @Checklist = Field(Row(@fields, 10), 1)
+          SET @Campaign_Producer = Field(Row(@fields, 11), 1)
+          SET @Creative_Job_ = Field(Row(@fields, 12), 1)
+          SET @Creative_DUE_modify_dayslogic = Field(Row(@fields, 13), 1)
+          SET @Campaign_Scheduled_Actual_Date = Field(Row(@fields, 14), 1)
+
+          /* Uncomment to enable upsert
+          IF NOT EMPTY(@Campaign_Name) THEN
+            UPSERTDE(@deName, 1, "Campaign_Name", @Campaign_Name,
+              "FISCAL_WEEK_ID", @FISCAL_WEEK_ID,
+              "Promo_StartDeployDate", @Promo_StartDeployDate,
+              "Deploy_Time", @Deploy_Time,
+              "Media_Type", @Media_Type,
+              "Campaign_Type", @Campaign_Type,
+              "Campaign_Manager", @Campaign_Manager,
+              "Audience_Prepared_by", @Audience_Prepared_by,
+              "Developer", @Developer,
+              "Checklist", @Checklist,
+              "Campaign_Producer", @Campaign_Producer,
+              "Creative_Job_", @Creative_Job_,
+              "Creative_DUE____modify_dayslogic", @Creative_DUE_modify_dayslogic,
+              "Campaign_Scheduled_Actual_Date", @Campaign_Scheduled_Actual_Date
+            )
+            SET @inserted = Add(@inserted, 1)
+          ENDIF
+          */
+        ENDIF
+      NEXT @i
+
+      OUTPUT("</tbody></table>")
+      OUTPUT(CONCAT("<p style='color:green;'>✅ Parsed ", Subtract(@rowCount, 1), " rows. Upserted ", @inserted, " rows into ", @deName, ".</p>"))
+    ELSE
+      OUTPUT("<p style='color:red;'>❌ CSV must contain exactly 14 columns after cleanup.</p>")
+    ENDIF
+  ELSE
+    OUTPUT("<p style='color:red;'>❌ CSV must contain a header and at least one data row.</p>")
+  ENDIF
+ELSE
+  OUTPUT("<p>🕒 Waiting for CSV input...</p>")
+ENDIF
+]%%
