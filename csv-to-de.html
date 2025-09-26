@@ -1,109 +1,112 @@
-%%[
-SET @overwriteDE = "YourExistingDEName"
-]%%
+<h2>Drag & Drop CSV to Overwrite Data Extension</h2>
+<div id="dropzone">Drop CSV file here</div>
+<form id="uploadForm" method="post" enctype="multipart/form-data">
+  <input type="file" name="csvfile" id="csvfile" accept=".csv" style="display:none" />
+  <input type="submit" value="Upload" style="display:none" />
+</form>
 
-<!DOCTYPE html>
-<html>
-<head>
-  <title>Upload CSV to Overwrite DE</title>
-  <style>
-    #dropzone {
-      width: 100%;
-      height: 200px;
-      border: 2px dashed #ccc;
-      border-radius: 10px;
-      text-align: center;
-      line-height: 200px;
-      font-size: 18px;
-      color: #666;
-      margin-bottom: 20px;
-    }
-    #dropzone.dragover {
-      border-color: #4CAF50;
-      color: #4CAF50;
-      background-color: #f9fff9;
-    }
-  </style>
-</head>
-<body>
-  <h2>Drag & Drop CSV to Overwrite Data Extension</h2>
-  <div id="dropzone">Drop CSV file here</div>
-  <form id="uploadForm" method="post" enctype="multipart/form-data">
-    <input type="file" name="csvfile" id="csvfile" accept=".csv" style="display:none" />
-    <input type="submit" value="Upload" style="display:none" />
-  </form>
+<script>
+  const dropzone = document.getElementById('dropzone');
+  const fileInput = document.getElementById('csvfile');
+  const form = document.getElementById('uploadForm');
 
-  <script>
-    const dropzone = document.getElementById('dropzone');
-    const fileInput = document.getElementById('csvfile');
-    const form = document.getElementById('uploadForm');
+  dropzone.addEventListener('dragover', function(e) {
+    e.preventDefault();
+    dropzone.classList.add('dragover');
+  });
 
-    dropzone.addEventListener('dragover', function(e) {
-      e.preventDefault();
-      dropzone.classList.add('dragover');
-    });
+  dropzone.addEventListener('dragleave', function(e) {
+    dropzone.classList.remove('dragover');
+  });
 
-    dropzone.addEventListener('dragleave', function(e) {
-      dropzone.classList.remove('dragover');
-    });
-
-    dropzone.addEventListener('drop', function(e) {
-      e.preventDefault();
-      dropzone.classList.remove('dragover');
-      const files = e.dataTransfer.files;
-      if (files.length > 0 && files[0].type === "text/csv") {
-        fileInput.files = files;
-        form.submit();
-      } else {
-        alert("Please drop a valid CSV file.");
-      }
-    });
-  </script>
-
-  <script runat="server">
-    Platform.Load("Core", "1.1.1");
-
-    function sanitizeFieldName(name) {
-      var cleaned = name.replace(/[\s\-]+/g, "_");
-      cleaned = cleaned.replace(/[^a-zA-Z0-9_]/g, "");
-      if (!/^[a-zA-Z]/.test(cleaned)) {
-        cleaned = "col_" + cleaned;
-      }
-      return cleaned;
-    }
-
-    var overwriteDE = Variable.GetValue("@overwriteDE");
-    var uploadedFile = Request.GetUploadedFile("csvfile");
-
-    if (uploadedFile && uploadedFile.Content) {
-      var csvContent = uploadedFile.Content;
-      var lines = csvContent.split(/\r?\n/);
-      var rawHeaders = lines[0].split(",");
-      var sanitizedHeaders = [];
-
-      for (var i = 0; i < rawHeaders.length; i++) {
-        sanitizedHeaders.push(sanitizeFieldName(rawHeaders[i].trim()));
-      }
-
-      // Clear existing rows
-      Platform.Function.DeleteData(overwriteDE, ["1"], ["1"]);
-
-      // Insert new rows
-      for (var i = 1; i < lines.length; i++) {
-        var row = lines[i].split(",");
-        if (row.length === sanitizedHeaders.length) {
-          var data = {};
-          for (var j = 0; j < sanitizedHeaders.length; j++) {
-            data[sanitizedHeaders[j]] = row[j].trim();
-          }
-          Platform.Function.InsertData(overwriteDE, data);
-        }
-      }
-
-      Write("<p style='color:green;'>Data Extension overwritten successfully.</p>");
+  dropzone.addEventListener('drop', function(e) {
+    e.preventDefault();
+    dropzone.classList.remove('dragover');
+    const files = e.dataTransfer.files;
+    if (files.length > 0 && files[0].type === "text/csv") {
+      fileInput.files = files;
+      form.submit();
     } else {
-      Write("<p style='color:red;'>No file uploaded or file is empty.</p>");
+      alert("Please drop a valid CSV file.");
     }
-  </script>
-</body>
-</html>
+  });
+</script>
+
+<script runat="server">
+Platform.Load("Core", "1.1.1");
+
+Write("<p>✅ Script started...</p>");
+
+function sanitizeFieldName(name) {
+  var cleaned = name.replace(/[\s\-]+/g, "_");
+  cleaned = cleaned.replace(/[^a-zA-Z0-9_]/g, "");
+  if (!/^[a-zA-Z]/.test(cleaned)) {
+    cleaned = "col_" + cleaned;
+  }
+  return cleaned;
+}
+
+try {
+  var overwriteDE = Variable.GetValue("@overwriteDE");
+  var uploadedFile = Request.GetUploadedFile("csvfile");
+
+  if (!uploadedFile || !uploadedFile.Content) {
+    Write("<p style='color:red;'>❌ No file uploaded or file is empty.</p>");
+    return;
+  }
+
+  Write("<p>📄 File uploaded. Size: " + uploadedFile.Content.length + " bytes</p>");
+
+  var csvContent = uploadedFile.Content;
+  var lines = csvContent.split(/\r?\n/);
+  Write("<p>📊 Total lines in CSV: " + lines.length + "</p>");
+
+  if (lines.length < 2) {
+    Write("<p style='color:red;'>❌ CSV must contain a header and at least one data row.</p>");
+    return;
+  }
+
+  var rawHeaders = lines[0].split(",");
+  var sanitizedHeaders = [];
+
+  for (var i = 0; i < rawHeaders.length; i++) {
+    var raw = rawHeaders[i].trim();
+    var clean = sanitizeFieldName(raw);
+    sanitizedHeaders.push(clean);
+  }
+
+  Write("<p>🧼 Sanitized headers: " + sanitizedHeaders.join(", ") + "</p>");
+
+  // Clear existing rows
+  Platform.Function.DeleteData(overwriteDE, ["1"], ["1"]);
+  Write("<p>🧹 Existing rows deleted from DE: " + overwriteDE + "</p>");
+
+  // Insert new rows
+  var insertedCount = 0;
+  for (var i = 1; i < lines.length; i++) {
+    var line = lines[i].trim();
+    if (line === "") {
+      Write("<p>⚠️ Skipping empty line " + (i + 1) + "</p>");
+      continue;
+    }
+
+    var row = line.split(",");
+    if (row.length !== sanitizedHeaders.length) {
+      Write("<p>⚠️ Skipping malformed row " + (i + 1) + ": " + line + "</p>");
+      continue;
+    }
+
+    var data = {};
+    for (var j = 0; j < sanitizedHeaders.length; j++) {
+      data[sanitizedHeaders[j]] = row[j].trim();
+    }
+
+    Platform.Function.InsertData(overwriteDE, data);
+    insertedCount++;
+  }
+
+  Write("<p style='color:green;'>✅ Successfully inserted " + insertedCount + " rows into <strong>" + overwriteDE + "</strong>.</p>");
+} catch (e) {
+  Write("<p style='color:red;'>🔥 SSJS Error: " + String(e) + "</p>");
+}
+</script>
