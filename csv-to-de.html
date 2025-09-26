@@ -116,21 +116,41 @@ document.addEventListener("DOMContentLoaded", function () {
 
     const rawHeaders = lines[0].split(",");
     const headerMap = {};
+    let promoDateIndex = -1;
 
     // Build map of allowed header indexes
     rawHeaders.forEach((header, index) => {
       const trimmed = header.trim();
       if (allowedHeaders.includes(trimmed)) {
         headerMap[index] = trimmed;
+        if (trimmed === "Promo Start/Deploy Date") {
+          promoDateIndex = index;
+        }
       }
     });
 
-    // Rebuild CSV with only allowed columns
-    const cleanedLines = lines.map(line => {
-      const cols = line.split(",");
-      const filtered = Object.keys(headerMap).map(i => cols[i] || "");
-      return filtered.join(",");
-    });
+    const today = new Date();
+    const cutoff = new Date(today);
+    cutoff.setDate(cutoff.getDate() - 30);
+
+    const cleanedLines = [];
+
+    // Add header row
+    cleanedLines.push(Object.keys(headerMap).map(i => rawHeaders[i].trim()).join(","));
+
+    // Process each row
+    for (let i = 1; i < lines.length; i++) {
+      const cols = lines[i].split(",");
+      if (cols.length < rawHeaders.length) continue;
+
+      const promoDateStr = cols[promoDateIndex]?.trim();
+      const promoDate = new Date(promoDateStr);
+
+      if (promoDateStr && !isNaN(promoDate) && promoDate >= cutoff) {
+        const filtered = Object.keys(headerMap).map(i => cols[i] || "");
+        cleanedLines.push(filtered.join(","));
+      }
+    }
 
     textarea.value = cleanedLines.join("\n");
   });
