@@ -35,7 +35,7 @@
 <script runat="server">
 Platform.Load("Core", "1.1.1");
 
-Write("<p>✅ Script started...</p>");
+Write("<p>✅ Script loaded...</p>");
 
 function sanitizeFieldName(name) {
   var cleaned = name.replace(/[\s\-]+/g, "_");
@@ -47,65 +47,71 @@ function sanitizeFieldName(name) {
 }
 
 try {
-  var overwriteDE = Variable.GetValue("@overwriteDE");
-  var uploadedFile = Request.GetUploadedFile("csvfile");
+  if (Request.Method == "POST") {
+    Write("<p>📨 Form submitted. Processing file...</p>");
 
-  if (!uploadedFile || !uploadedFile.Content) {
-    Write("<p style='color:red;'>❌ No file uploaded or file is empty.</p>");
-    return;
-  }
+    var overwriteDE = Variable.GetValue("@overwriteDE");
+    var uploadedFile = Request.GetUploadedFile("csvfile");
 
-  Write("<p>📄 File uploaded. Size: " + uploadedFile.Content.length + " bytes</p>");
-
-  var csvContent = uploadedFile.Content;
-  var lines = csvContent.split(/\r?\n/);
-  Write("<p>📊 Total lines in CSV: " + lines.length + "</p>");
-
-  if (lines.length < 2) {
-    Write("<p style='color:red;'>❌ CSV must contain a header and at least one data row.</p>");
-    return;
-  }
-
-  var rawHeaders = lines[0].split(",");
-  var sanitizedHeaders = [];
-
-  for (var i = 0; i < rawHeaders.length; i++) {
-    var raw = rawHeaders[i].trim();
-    var clean = sanitizeFieldName(raw);
-    sanitizedHeaders.push(clean);
-  }
-
-  Write("<p>🧼 Sanitized headers: " + sanitizedHeaders.join(", ") + "</p>");
-
-  // Clear existing rows
-  Platform.Function.DeleteData(overwriteDE, ["1"], ["1"]);
-  Write("<p>🧹 Existing rows deleted from DE: " + overwriteDE + "</p>");
-
-  // Insert new rows
-  var insertedCount = 0;
-  for (var i = 1; i < lines.length; i++) {
-    var line = lines[i].trim();
-    if (line === "") {
-      Write("<p>⚠️ Skipping empty line " + (i + 1) + "</p>");
-      continue;
+    if (!uploadedFile || !uploadedFile.Content) {
+      Write("<p style='color:red;'>❌ No file uploaded or file is empty.</p>");
+      return;
     }
 
-    var row = line.split(",");
-    if (row.length !== sanitizedHeaders.length) {
-      Write("<p>⚠️ Skipping malformed row " + (i + 1) + ": " + line + "</p>");
-      continue;
+    Write("<p>📄 File uploaded. Size: " + uploadedFile.Content.length + " bytes</p>");
+
+    var csvContent = uploadedFile.Content;
+    var lines = csvContent.split(/\r?\n/);
+    Write("<p>📊 Total lines in CSV: " + lines.length + "</p>");
+
+    if (lines.length < 2) {
+      Write("<p style='color:red;'>❌ CSV must contain a header and at least one data row.</p>");
+      return;
     }
 
-    var data = {};
-    for (var j = 0; j < sanitizedHeaders.length; j++) {
-      data[sanitizedHeaders[j]] = row[j].trim();
+    var rawHeaders = lines[0].split(",");
+    var sanitizedHeaders = [];
+
+    for (var i = 0; i < rawHeaders.length; i++) {
+      var raw = rawHeaders[i].trim();
+      var clean = sanitizeFieldName(raw);
+      sanitizedHeaders.push(clean);
     }
 
-    Platform.Function.InsertData(overwriteDE, data);
-    insertedCount++;
+    Write("<p>🧼 Sanitized headers: " + sanitizedHeaders.join(", ") + "</p>");
+
+    // Clear existing rows
+    Platform.Function.DeleteData(overwriteDE, ["1"], ["1"]);
+    Write("<p>🧹 Existing rows deleted from DE: " + overwriteDE + "</p>");
+
+    // Insert new rows
+    var insertedCount = 0;
+    for (var i = 1; i < lines.length; i++) {
+      var line = lines[i].trim();
+      if (line === "") {
+        Write("<p>⚠️ Skipping empty line " + (i + 1) + "</p>");
+        continue;
+      }
+
+      var row = line.split(",");
+      if (row.length !== sanitizedHeaders.length) {
+        Write("<p>⚠️ Skipping malformed row " + (i + 1) + ": " + line + "</p>");
+        continue;
+      }
+
+      var data = {};
+      for (var j = 0; j < sanitizedHeaders.length; j++) {
+        data[sanitizedHeaders[j]] = row[j].trim();
+      }
+
+      Platform.Function.InsertData(overwriteDE, data);
+      insertedCount++;
+    }
+
+    Write("<p style='color:green;'>✅ Successfully inserted " + insertedCount + " rows into <strong>" + overwriteDE + "</strong>.</p>");
+  } else {
+    Write("<p>🕒 Waiting for file upload...</p>");
   }
-
-  Write("<p style='color:green;'>✅ Successfully inserted " + insertedCount + " rows into <strong>" + overwriteDE + "</strong>.</p>");
 } catch (e) {
   Write("<p style='color:red;'>🔥 SSJS Error: " + String(e) + "</p>");
 }
