@@ -1,18 +1,21 @@
+<h2>📥 Upload CSV to Upsert into Data Extension</h2>
 <form method="post" enctype="multipart/form-data">
   <input type="file" name="csvfile" accept=".csv" required />
   <br><br>
   <input type="submit" value="Upload and Upsert" />
 </form>
+
 <script runat="server">
 Platform.Load("Core", "1.1.1");
 
-var uploadedFile = Request.GetUploadedFile("csvfile");
 var csvContent = "";
-
-if (uploadedFile && uploadedFile.Content && uploadedFile.Content.length > 0) {
-  csvContent = uploadedFile.Content;
-} else {
-  csvContent = "ERROR: No file uploaded or file is empty";
+try {
+  var uploadedFile = Request.GetUploadedFile("csvfile");
+  if (uploadedFile && uploadedFile.Content && uploadedFile.Content.length > 0) {
+    csvContent = uploadedFile.Content;
+  }
+} catch (e) {
+  csvContent = "ERROR: " + String(e);
 }
 
 Variable.SetValue("csvContent", csvContent);
@@ -23,6 +26,8 @@ SET @csvContent = AttributeValue("csvContent")
 SET @deName = "YourDataExtensionName"
 
 IF IndexOf(@csvContent, "ERROR:") == 0 THEN
+  OUTPUT(CONCAT("<p style='color:red;'>", @csvContent, "</p>"))
+ELSEIF NOT EMPTY(@csvContent) THEN
   SET @lines = BuildRowsetFromString(@csvContent, "\n")
   SET @rowCount = RowCount(@lines)
 
@@ -50,6 +55,6 @@ IF IndexOf(@csvContent, "ERROR:") == 0 THEN
     OUTPUT("<p style='color:red;'>❌ CSV must contain a header and at least one data row.</p>")
   ENDIF
 ELSE
-  OUTPUT(CONCAT("<p style='color:red;'>", @csvContent, "</p>"))
+  OUTPUT("<p style='color:red;'>❌ No CSV content found. Make sure the file was uploaded correctly.</p>")
 ENDIF
 ]%%
