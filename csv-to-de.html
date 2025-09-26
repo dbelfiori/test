@@ -1,6 +1,6 @@
-<h2>📋 Paste CSV Content</h2>
+<h2>📋 Paste Campaign CSV Content</h2>
 <form method="post">
-  <textarea name="csvText" rows="10" cols="100" placeholder="Paste CSV here..." required></textarea>
+  <textarea name="csvText" rows="12" cols="100" placeholder="Paste CSV here..." required></textarea>
   <br><br>
   <input type="submit" value="Preview and Upsert" />
 </form>
@@ -14,14 +14,14 @@ IF NOT EMPTY(@csvContent) THEN
   SET @rowCount = RowCount(@lines)
 
   IF @rowCount > 1 THEN
-    SET @headerRow = Row(@lines, 1)
-    SET @headers = BuildRowsetFromString(@headerRow, ",")
-    SET @fieldCount = RowCount(@headers)
     SET @inserted = 0
 
+    /* Define expected headers in order */
+    SET @expectedHeaders = BuildRowsetFromString("FISCAL_WEEK_ID,Promo Start/Deploy Date,Deploy Time,Media Type,Campaign Type,Campaign Name,Campaign Manager,Audience Prepared by,Developer,Checklist,Campaign Producer,Creative Job #,Creative DUE -  modify days/logic,Campaign Scheduled (Actual Date)", ",")
+
     OUTPUT("<table border='1'><thead><tr>")
-    FOR @h = 1 TO @fieldCount DO
-      SET @header = Field(Row(@headers, @h), 1)
+    FOR @h = 1 TO RowCount(@expectedHeaders) DO
+      SET @header = Field(Row(@expectedHeaders, @h), 1)
       OUTPUT(CONCAT("<th>", @header, "</th>"))
     NEXT @h
     OUTPUT("</tr></thead><tbody>")
@@ -30,15 +30,16 @@ IF NOT EMPTY(@csvContent) THEN
       SET @line = Row(@lines, @i)
       SET @fields = BuildRowsetFromString(@line, ",")
 
-      IF RowCount(@fields) == @fieldCount THEN
+      IF RowCount(@fields) >= 14 THEN
+        /* Display row */
         OUTPUT("<tr>")
-        FOR @j = 1 TO @fieldCount DO
+        FOR @j = 1 TO 14 DO
           SET @value = Field(Row(@fields, @j), 1)
           OUTPUT(CONCAT("<td>", @value, "</td>"))
         NEXT @j
         OUTPUT("</tr>")
 
-        /* Static mapping — adjust indexes to match your DE */
+        /* Map fields */
         SET @FISCAL_WEEK_ID = Field(Row(@fields, 1), 1)
         SET @Promo_StartDeployDate = Field(Row(@fields, 2), 1)
         SET @Deploy_Time = Field(Row(@fields, 3), 1)
@@ -51,7 +52,7 @@ IF NOT EMPTY(@csvContent) THEN
         SET @Checklist = Field(Row(@fields, 10), 1)
         SET @Campaign_Producer = Field(Row(@fields, 11), 1)
         SET @Creative_Job_ = Field(Row(@fields, 12), 1)
-        SET @Creative_DUE____modify_dayslogic = Field(Row(@fields, 13), 1)
+        SET @Creative_DUE_modify_dayslogic = Field(Row(@fields, 13), 1)
         SET @Campaign_Scheduled_Actual_Date = Field(Row(@fields, 14), 1)
 
         IF NOT EMPTY(@Campaign_Name) THEN
@@ -67,7 +68,7 @@ IF NOT EMPTY(@csvContent) THEN
             "Checklist", @Checklist,
             "Campaign_Producer", @Campaign_Producer,
             "Creative_Job_", @Creative_Job_,
-            "Creative_DUE____modify_dayslogic", @Creative_DUE____modify_dayslogic,
+            "Creative_DUE____modify_dayslogic", @Creative_DUE_modify_dayslogic,
             "Campaign_Scheduled_Actual_Date", @Campaign_Scheduled_Actual_Date
           )
           SET @inserted = Add(@inserted, 1)
