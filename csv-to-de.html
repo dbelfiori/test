@@ -1,52 +1,32 @@
 %%[
-SET @overwriteDE = "YourTargetDEName"
+SET @overwriteDE = "YourExistingDEName"
 ]%%
 
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Drag & Drop CSV to Overwrite DE</title>
+  <title>Upload CSV to Overwrite DE</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      padding: 20px;
-    }
-    #dropZone {
+    #dropzone {
       width: 100%;
-      max-width: 400px;
       height: 200px;
-      border: 2px dashed #aaa;
+      border: 2px dashed #ccc;
       border-radius: 10px;
       text-align: center;
       line-height: 200px;
+      font-size: 18px;
       color: #666;
       margin-bottom: 20px;
-      transition: border-color 0.3s;
     }
-    #dropZone.dragover {
-      border-color: #0070c0;
-      color: #0070c0;
-    }
-    #previewContainer {
-      margin-top: 20px;
-    }
-    #previewImage {
-      max-width: 100%;
-      border: 1px solid #ccc;
-      margin-bottom: 10px;
-    }
-    #downloadLink {
-      display: inline-block;
-      padding: 8px 12px;
-      background-color: #0070c0;
-      color: white;
-      text-decoration: none;
-      border-radius: 4px;
+    #dropzone.dragover {
+      border-color: #4CAF50;
+      color: #4CAF50;
+      background-color: #f9fff9;
     }
   </style>
 </head>
 <body>
-  <h2>CSV to Data Extension</h2>
+  <h2>Drag & Drop CSV to Overwrite Data Extension</h2>
   <div id="dropzone">Drop CSV file here</div>
   <form id="uploadForm" method="post" enctype="multipart/form-data">
     <input type="file" name="csvfile" id="csvfile" accept=".csv" style="display:none" />
@@ -57,16 +37,6 @@ SET @overwriteDE = "YourTargetDEName"
     const dropzone = document.getElementById('dropzone');
     const fileInput = document.getElementById('csvfile');
     const form = document.getElementById('uploadForm');
-
-    function sanitizeFieldName(name) {
-    // Replace spaces and dashes with underscores
-    var cleaned = name.replace(/[\s\-]+/g, "_");
-
-    // Remove all other non-alphanumeric characters except underscore
-    cleaned = cleaned.replace(/[^a-zA-Z0-9_]/g, "");
-
-    return cleaned;
-    }
 
     dropzone.addEventListener('dragover', function(e) {
       e.preventDefault();
@@ -93,13 +63,27 @@ SET @overwriteDE = "YourTargetDEName"
   <script runat="server">
     Platform.Load("Core", "1.1.1");
 
+    function sanitizeFieldName(name) {
+      var cleaned = name.replace(/[\s\-]+/g, "_");
+      cleaned = cleaned.replace(/[^a-zA-Z0-9_]/g, "");
+      if (!/^[a-zA-Z]/.test(cleaned)) {
+        cleaned = "col_" + cleaned;
+      }
+      return cleaned;
+    }
+
     var overwriteDE = Variable.GetValue("@overwriteDE");
     var uploadedFile = Request.GetUploadedFile("csvfile");
 
     if (uploadedFile && uploadedFile.Content) {
       var csvContent = uploadedFile.Content;
       var lines = csvContent.split(/\r?\n/);
-      var headers = lines[0].split(",");
+      var rawHeaders = lines[0].split(",");
+      var sanitizedHeaders = [];
+
+      for (var i = 0; i < rawHeaders.length; i++) {
+        sanitizedHeaders.push(sanitizeFieldName(rawHeaders[i].trim()));
+      }
 
       // Clear existing rows
       Platform.Function.DeleteData(overwriteDE, ["1"], ["1"]);
@@ -107,10 +91,10 @@ SET @overwriteDE = "YourTargetDEName"
       // Insert new rows
       for (var i = 1; i < lines.length; i++) {
         var row = lines[i].split(",");
-        if (row.length === headers.length) {
+        if (row.length === sanitizedHeaders.length) {
           var data = {};
-          for (var j = 0; j < headers.length; j++) {
-            data[headers[j].trim()] = row[j].trim();
+          for (var j = 0; j < sanitizedHeaders.length; j++) {
+            data[sanitizedHeaders[j]] = row[j].trim();
           }
           Platform.Function.InsertData(overwriteDE, data);
         }
