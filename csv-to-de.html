@@ -16,45 +16,49 @@ function sanitizeHeader(header) {
     .replace(/[^A-Za-z0-9_]/g, "");
 }
 
-var uploadedFile = Request.GetUploadedFile("csvfile");
-var csvContent = "";
 var htmlTable = "";
 var rowCount = 0;
 
-if (uploadedFile && uploadedFile.Content && uploadedFile.Content.length > 0) {
-  csvContent = uploadedFile.Content;
-  var lines = csvContent.split(/\r?\n/);
-  var rawHeaders = lines[0].split(",");
-  var headers = [];
+try {
+  var uploadedFile = Request.GetUploadedFile("csvfile");
 
-  for (var h = 0; h < rawHeaders.length; h++) {
-    headers[h] = sanitizeHeader(rawHeaders[h]);
-  }
+  if (uploadedFile && uploadedFile.Content && uploadedFile.Content.length > 0) {
+    var csvContent = uploadedFile.Content;
+    var lines = csvContent.split(/\r?\n/);
+    var rawHeaders = lines[0].split(",");
+    var headers = [];
 
-  htmlTable += "<table border='1' cellpadding='5' cellspacing='0'><thead><tr>";
-  for (var h = 0; h < headers.length; h++) {
-    htmlTable += "<th>" + headers[h] + "</th>";
-  }
-  htmlTable += "</tr></thead><tbody>";
-
-  for (var i = 1; i < lines.length; i++) {
-    var row = lines[i].split(",");
-    if (row.length !== headers.length) continue;
-
-    htmlTable += "<tr>";
-    for (var j = 0; j < row.length; j++) {
-      htmlTable += "<td>" + row[j].trim() + "</td>";
+    for (var h = 0; h < rawHeaders.length; h++) {
+      headers[h] = sanitizeHeader(rawHeaders[h]);
     }
-    htmlTable += "</tr>";
 
-    for (var k = 0; k < headers.length; k++) {
-      Variable.SetValue(headers[k] + "_" + i, row[k].trim());
+    htmlTable += "<table border='1' cellpadding='5' cellspacing='0'><thead><tr>";
+    for (var h = 0; h < headers.length; h++) {
+      htmlTable += "<th>" + headers[h] + "</th>";
     }
-    rowCount++;
-  }
+    htmlTable += "</tr></thead><tbody>";
 
-  htmlTable += "</tbody></table>";
-  Variable.SetValue("rowCount", rowCount);
+    for (var i = 1; i < lines.length; i++) {
+      var row = lines[i].split(",");
+      if (row.length !== headers.length) continue;
+
+      htmlTable += "<tr>";
+      for (var j = 0; j < row.length; j++) {
+        htmlTable += "<td>" + row[j].trim() + "</td>";
+      }
+      htmlTable += "</tr>";
+
+      for (var k = 0; k < headers.length; k++) {
+        Variable.SetValue(headers[k] + "_" + i, row[k].trim());
+      }
+      rowCount++;
+    }
+
+    htmlTable += "</tbody></table>";
+    Variable.SetValue("rowCount", rowCount);
+  }
+} catch (e) {
+  htmlTable = "<p style='color:red;'>⚠️ Error reading file: " + String(e) + "</p>";
 }
 
 Write(htmlTable);
